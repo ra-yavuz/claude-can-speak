@@ -59,7 +59,16 @@ jobs:
 
       - name: publish to npm
         # Requires the NPM_TOKEN repository secret (an npm automation token).
-        run: npm publish --access public
+        # Idempotent: if this exact version is already on the registry (for
+        # example, published manually), skip rather than fail the run.
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version already published, skipping."
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
