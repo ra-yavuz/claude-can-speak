@@ -17,7 +17,6 @@ set -uo pipefail
 # --- Resolve config -------------------------------------------------------
 CCS_HOME="${CCS_HOME:-$HOME/.config/claude-can-speak}"
 CCS_CONFIG="$CCS_HOME/config.env"
-SETTINGS_JSON="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 CONTAINER="${CCS_CONTAINER:-ccs-tts}"
 IMAGE="${CCS_IMAGE:-claude-can-speak:latest}"
 MODELS_DIR="${CCS_MODELS_DIR:-$HOME/.cache/claude-can-speak/models}"
@@ -51,23 +50,13 @@ done
 # --- Read the Stop hook payload ------------------------------------------
 PAYLOAD="$(cat)"
 
-# --- Gate: only speak when /voice mode is on ------------------------------
-# Read voiceEnabled OR voice.enabled from settings.json. Absent/false = off.
-voice_on() {
-  [ -f "$SETTINGS_JSON" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    local v
-    v="$(jq -r '(.voiceEnabled // .voice.enabled // false) | tostring' \
-          "$SETTINGS_JSON" 2>/dev/null)"
-    [ "$v" = "true" ]
-    return
-  fi
-  # jq-less fallback: grep the two known keys.
-  grep -Eq '"voiceEnabled"[[:space:]]*:[[:space:]]*true' "$SETTINGS_JSON" && return 0
-  grep -Eq '"enabled"[[:space:]]*:[[:space:]]*true' "$SETTINGS_JSON" && return 0
-  return 1
-}
-voice_on || { log "voice gate off; silent"; exit 0; }
+# --- Gate: only speak when the firehose is explicitly ON ------------------
+# claude-can-speak owns its own on/off state, decoupled from Claude Code's
+# /voice (which is speech-IN dictation and is not reliably readable here).
+# Default is OFF: the state file exists only when the user ran
+# `claude-can-speak on`. This guarantees a real, predictable off-switch.
+ENABLED_FLAG="${CCS_ENABLED_FLAG:-$CCS_HOME/firehose.enabled}"
+[ -f "$ENABLED_FLAG" ] || { log "firehose off; silent"; exit 0; }
 
 # --- Extract the reply text ----------------------------------------------
 extract_text() {

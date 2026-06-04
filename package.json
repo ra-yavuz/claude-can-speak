@@ -1,6 +1,6 @@
 {
   "name": "claude-can-speak",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Let Claude Code decide what to say out loud: a skill that voices deliberate notifications (not every reply), plus an optional speak-everything Stop hook. Local neural TTS via Kokoro/Piper in Docker, gated on /voice.",
   "keywords": [
     "claude",
@@ -28,8 +28,12 @@
   "bin": {
     "claude-can-speak": "bin/cli.js"
   },
+  "scripts": {
+    "postinstall": "node bin/postinstall.js"
+  },
   "files": [
     "bin/cli.js",
+    "bin/postinstall.js",
     "bin/claude-can-speak",
     "lib/claude-can-speak/",
     "container/",

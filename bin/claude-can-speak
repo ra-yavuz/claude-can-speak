@@ -9,7 +9,7 @@
 # any damage or loss arising from its use. By using it you accept all risk.
 set -uo pipefail
 
-VERSION="0.1.1"
+VERSION="0.1.2"
 
 # Install layout: bundled scripts live in ../lib/claude-can-speak relative to
 # this CLI, whether installed via npm (into the global node_modules) or run from
@@ -27,6 +27,7 @@ LIBEXEC="$SELF/../lib/claude-can-speak"
 CCS_HOME="${CCS_HOME:-$HOME/.config/claude-can-speak}"
 CONFIG="$CCS_HOME/config.env"
 PIDFILE="$CCS_HOME/speaking.pid"
+ENABLED_FLAG="$CCS_HOME/firehose.enabled"
 CONTAINER="${CCS_CONTAINER:-ccs-tts}"
 IMAGE="${CCS_IMAGE:-claude-can-speak:latest}"
 MODELS_DIR="${CCS_MODELS_DIR:-$HOME/.cache/claude-can-speak/models}"
@@ -64,10 +65,12 @@ USAGE
   claude-can-speak <command> [args]
 
 COMMANDS
-  status            Show gate state, container, config, and model cache.
+  setup             One-shot install: Docker check, build, skill, hook.
+  on | off          Turn the firehose (speak every reply) on or off. Default off.
+  status            Show firehose state, container, config, and model cache.
   test [text]       Speak a sample (or the given text) with the current voice.
   stop              Interrupt any reply currently being spoken.
-  say <text>        Speak arbitrary text now (ignores the /voice gate).
+  say <text>        Speak arbitrary text now (always speaks; used by the skill).
   start | up        Start the persistent TTS container.
   stop-container    Stop and remove the TTS container.
   voice <name>      Set the default voice (e.g. af_heart, af_bella).
@@ -81,16 +84,19 @@ COMMANDS
   help | --help     This text.
 
 TWO MODES
-  Firehose : the Stop hook speaks every reply while /voice is on
-             (claude-can-speak install-hooks).
-  Deliberate: the 'speak' skill lets Claude choose what to voice
-             (notifications, shoutouts) via 'claude-can-speak say'
-             (claude-can-speak install-skill). Toggle with 'skill on|off'.
+  Deliberate (the headline): the 'speak' skill lets Claude choose what to
+             voice (notifications, shoutouts) via 'claude-can-speak say'.
+             Install with 'claude-can-speak install-skill'.
+  Firehose (optional): the Stop hook speaks every reply when the firehose is
+             on. Install the hook with 'claude-can-speak install-hooks', then
+             toggle with 'claude-can-speak on' / 'off'.
 
 GATING
-  Speech-out only runs while /voice mode is on (voiceEnabled / voice.enabled
-  in $SETTINGS_JSON). Toggle /voice in Claude Code to switch both speech-in
-  and speech-out at once. Turn it off for full silence.
+  The firehose has its own explicit on/off switch ('claude-can-speak on|off',
+  default OFF), stored in ~/.config/claude-can-speak/firehose.enabled. It is
+  intentionally NOT tied to Claude Code's /voice, which is speech-IN dictation
+  and is a separate concern. The deliberate 'speak' skill always speaks when
+  invoked, regardless of the firehose switch.
 
 DISCLAIMER
   Provided AS IS, with NO WARRANTY. You accept all risk. See the project
@@ -179,12 +185,11 @@ cmd_test() {
 
 cmd_status() {
   echo "claude-can-speak $VERSION"
-  printf 'voice gate   : '
-  if [ -f "$SETTINGS_JSON" ] && command -v jq >/dev/null 2>&1 \
-     && [ "$(jq -r '(.voiceEnabled // .voice.enabled // false)|tostring' "$SETTINGS_JSON" 2>/dev/null)" = true ]; then
-    echo "ON  (/voice enabled)"
+  printf 'firehose     : '
+  if [ -f "$ENABLED_FLAG" ]; then
+    echo "ON  (replies spoken; 'claude-can-speak off' to silence)"
   else
-    echo "off (/voice disabled) - replies will be silent"
+    echo "off (replies silent; 'claude-can-speak on' to enable)"
   fi
   printf 'engine/voice : %s / %s (%s)\n' "$ENGINE" "$VOICE" "$LANG"
   printf 'image        : '; ensure_image && echo "$IMAGE present" || echo "$IMAGE MISSING (run: build)"
@@ -231,6 +236,41 @@ kokoro voices (English; af_=US female, am_=US male, bf_/bm_=British):
   af_nova  af_sky  af_jessica  af_river  am_michael  am_fenrir  am_puck
 EOF
   fi
+}
+
+cmd_on() {
+  mkdir -p "$CCS_HOME"
+  : > "$ENABLED_FLAG"
+  echo "firehose ON: replies will be spoken (needs the Stop hook; run install-hooks if you have not)."
+}
+
+cmd_off() {
+  rm -f "$ENABLED_FLAG" 2>/dev/null
+  # Also stop anything currently speaking.
+  cmd_stop >/dev/null 2>&1 || true
+  echo "firehose OFF: replies will not be spoken."
+}
+
+# One-shot setup: the happy path after `npm install -g`. Docker check, build the
+# image, install the deliberate skill and the firehose hook. Idempotent.
+cmd_setup() {
+  echo "claude-can-speak setup"
+  require_docker
+  echo "1/3 building the TTS container image (first time pulls deps, ~2 min) ..."
+  cmd_build
+  echo "2/3 installing the 'speak' skill ..."
+  cmd_install_skill
+  echo "3/3 installing the firehose Stop hook ..."
+  cmd_install_hooks
+  cat <<EOF
+
+Setup complete.
+  - Deliberate mode: Claude can voice notifications via the 'speak' skill (active now).
+  - Firehose mode:   turn it on with 'claude-can-speak on' (off by default).
+  Restart Claude Code once so it loads the new skill and hook, then try:
+    claude-can-speak on
+    claude-can-speak test
+EOF
 }
 
 cmd_install_skill() {
@@ -280,6 +320,9 @@ cmd_remove_hooks() {
 }
 
 case "${1:-help}" in
+  setup)          cmd_setup ;;
+  on)             cmd_on ;;
+  off)            cmd_off ;;
   status)         cmd_status ;;
   test)           shift; cmd_test "$@" ;;
   say)            shift; cmd_say "$@" ;;
