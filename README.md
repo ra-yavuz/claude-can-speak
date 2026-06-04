@@ -8,15 +8,14 @@ when you have stepped away, a heads-up that a deploy needs confirmation, a short
 shoutout you asked for, while everything else stays text-only. Selective, on
 purpose, model-controlled.
 
-If you *do* want the firehose, it is one command away: a Stop hook that speaks
-every finished reply, gated on the built-in `/voice` mode so one switch controls
-both directions (you talk to it, it talks back). But the deliberate skill is the
-point.
+If you *do* want the firehose, it is one switch away: a Stop hook that speaks
+every finished reply, with its own explicit on/off (`claude-can-speak on` /
+`off`, off by default). But the deliberate skill is the point.
 
 - **Deliberate mode (the headline)** - the `speak` skill lets Claude choose what
-  to voice. Install with `claude-can-speak install-skill`.
-- **Firehose mode (optional)** - a Stop hook speaks every reply while `/voice` is
-  on. Install with `claude-can-speak install-hooks`.
+  to voice. Active after `claude-can-speak setup`.
+- **Firehose mode (optional)** - a Stop hook speaks every reply when you turn it
+  on with `claude-can-speak on` (off by default).
 
 Speech is synthesised locally by [Kokoro](https://github.com/thewh1teagle/kokoro-onnx)
 (natural English, the default) or [Piper](https://github.com/OHF-Voice/piper1-gpl)
@@ -37,40 +36,51 @@ network at speak time, no telemetry.
 
 ```sh
 npm install -g claude-can-speak
-
-# one-time: build the local TTS container image (needs Docker)
-claude-can-speak build
+claude-can-speak setup     # Docker check, build image, install skill + hook
 ```
+
+`setup` is the one command that does everything (it needs Docker). Then
+**restart Claude Code once** so it loads the new skill and hook.
 
 > If `npm install -g` fails with `EACCES` (a system-owned npm prefix like
 > `/usr`), either use a user-level prefix once:
 > `npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH"`
 > (add that `export` to your shell profile), or install with `sudo`.
 
-Then pick the mode(s) you want:
+After setup:
+
+- **Deliberate mode** (the headline) is active: Claude can voice notifications
+  through the `speak` skill whenever it judges something worth hearing.
+- **Firehose mode** (speak every reply) is **off by default**. Turn it on when
+  you want it:
 
 ```sh
-claude-can-speak install-skill    # deliberate mode: the 'speak' skill
-claude-can-speak install-hooks    # firehose mode: speak every reply on /voice
+claude-can-speak on      # speak every reply
+claude-can-speak off     # back to silent (default)
 ```
 
 Models are downloaded on first use into `~/.cache/claude-can-speak/models`
 (nothing model-shaped is bundled in the package; see
 [THIRD_PARTY.md](THIRD_PARTY.md)).
 
-Then in Claude Code, toggle `/voice` on. Check everything with:
+Check everything with:
 
 ```sh
 claude-can-speak status
 claude-can-speak test          # speak a sample line
 ```
 
+If you prefer to do the steps by hand instead of `setup`: `claude-can-speak
+build`, then `claude-can-speak install-skill` and/or `claude-can-speak
+install-hooks`.
+
 ## Usage
 
 ```sh
 claude-can-speak status            # gate state, container, voice, model cache
 claude-can-speak test [text]       # speak a sample (or your text)
-claude-can-speak say <text>        # speak text now (ignores the /voice gate)
+claude-can-speak on | off          # firehose: speak every reply, or not (default off)
+claude-can-speak say <text>        # speak text now (always speaks; used by the skill)
 claude-can-speak stop              # interrupt whatever is being spoken
 claude-can-speak voice <name>      # set the default voice (e.g. af_heart)
 claude-can-speak engine kokoro|piper
@@ -102,7 +112,7 @@ claude-can-speak voice tr_TR-dfki-medium     # Turkish
 ## How it works
 
 ```
-Claude Code reply ─▶ Stop hook (gated on /voice) ─▶ strip markdown & code
+Claude Code reply ─▶ Stop hook (when firehose on) ─▶ strip markdown & code
                                                    ─▶ docker exec synth (Kokoro/Piper)
                                                    ─▶ play WAV on the host
 ```
@@ -118,8 +128,11 @@ Per-user config lives in `~/.config/claude-can-speak/config.env` (written by the
 `voice` / `engine` commands). Environment overrides: `CCS_IMAGE`,
 `CCS_CONTAINER`, `CCS_MODELS_DIR`, `CLAUDE_SETTINGS`.
 
-The `/voice` gate is read from `~/.claude/settings.json` (`voiceEnabled` or
-`voice.enabled`). The `speak` skill is toggled via `skillOverrides` there.
+The firehose on/off state is a single file, `~/.config/claude-can-speak/firehose.enabled`
+(present = on, absent = off), written by `claude-can-speak on` / `off`. It is
+deliberately independent of Claude Code's `/voice`, which is speech-in dictation,
+a separate concern. The `speak` skill is toggled via `skillOverrides` in
+`~/.claude/settings.json`.
 
 ## Uninstall
 
@@ -154,9 +167,9 @@ aloud", any of those is a fine choice and lighter than this one (no Docker).
 
 claude-can-speak is built around a different default: the deliberate `speak`
 skill, so Claude voices only what is worth hearing rather than everything. It
-also adds multilingual output (Piper for German, Turkish, and more), Docker
-isolation so the engines never touch your host Python, and gating on the built-in
-`/voice` switch. The firehose mode is included, but it is not the headline.
+also adds multilingual output (Piper for German, Turkish, and more) and Docker
+isolation so the engines never touch your host Python. The firehose mode is
+included, with its own explicit on/off switch, but it is not the headline.
 
 ## Licence
 

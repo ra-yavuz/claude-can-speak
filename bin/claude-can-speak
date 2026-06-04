@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-can-speak: speech-out for Claude Code, gated on /voice mode.
+# claude-can-speak: speech-out for Claude Code (deliberate skill + optional firehose).
 #
 # This CLI manages the TTS container and the playback lifecycle. The speaking
 # itself is driven by a Stop hook (tts-speak.sh); this command is for setup,
@@ -59,7 +59,7 @@ require_docker() {
 
 cmd_help() {
   cat <<EOF
-claude-can-speak $VERSION - speech-out for Claude Code (gated on /voice)
+claude-can-speak $VERSION - speech-out for Claude Code
 
 USAGE
   claude-can-speak <command> [args]

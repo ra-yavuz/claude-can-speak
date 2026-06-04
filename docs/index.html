@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>claude-can-speak - Speech-out for Claude Code</title>
-<meta name="description" content="claude-can-speak by Ramazan Yavuz: make Claude Code talk back. A Stop hook speaks every reply while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS (Kokoro / Piper) in Docker. No cloud, no API keys.">
+<meta name="description" content="claude-can-speak by Ramazan Yavuz: make Claude Code talk back. A skill lets Claude voice deliberate notifications, plus an optional speak-everything firehose. Local neural TTS (Kokoro / Piper) in Docker. No cloud, no API keys.">
 <meta name="author" content="Ramazan Yavuz">
 <meta name="keywords" content="claude-can-speak, claude code, text to speech, tts, voice output, kokoro, piper, claude code hook, claude code skill, local tts, offline tts">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://ra-yavuz.github.io/claude-can-speak/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="claude-can-speak - Now Claude Code talks back">
-<meta property="og:description" content="Speech-out for Claude Code. A Stop hook reads replies aloud while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS, no cloud.">
+<meta property="og:description" content="Speech-out for Claude Code. A skill lets Claude voice deliberate notifications, plus an optional speak-everything firehose. Local neural TTS, no cloud.">
 <meta property="og:url" content="https://ra-yavuz.github.io/claude-can-speak/">
 <meta property="og:site_name" content="ra-yavuz">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="claude-can-speak - Now Claude Code talks back">
-<meta name="twitter:description" content="Speech-out for Claude Code. Local neural TTS (Kokoro / Piper) in Docker, gated on /voice. No cloud, no API keys.">
+<meta name="twitter:description" content="Speech-out for Claude Code. Local neural TTS (Kokoro / Piper) in Docker. No cloud, no API keys.">
 <meta property="og:image" content="https://ra-yavuz.github.io/claude-can-speak/logo.png">
 <meta name="twitter:image" content="https://ra-yavuz.github.io/claude-can-speak/logo.png">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -73,10 +73,10 @@
   "name": "claude-can-speak",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Linux, macOS, Windows (WSL)",
-  "description": "Speech-out for Claude Code. A Stop hook reads each reply aloud while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS (Kokoro / Piper) in Docker, no cloud and no API keys.",
+  "description": "Speech-out for Claude Code. A skill lets Claude voice deliberate notifications, plus an optional speak-everything firehose. Local neural TTS (Kokoro / Piper) in Docker, no cloud and no API keys.",
   "url": "https://ra-yavuz.github.io/claude-can-speak/",
   "downloadUrl": "https://www.npmjs.com/package/claude-can-speak",
-  "softwareVersion": "0.1.0",
+  "softwareVersion": "0.1.2",
   "license": "https://opensource.org/licenses/MIT",
   "author": { "@type": "Person", "name": "Ramazan Yavuz", "url": "https://ra-yavuz.github.io/" },
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -115,8 +115,8 @@
     </tr>
     <tr>
       <td><strong>Firehose</strong><br><span style="color:var(--muted);font-size:0.82rem;">optional</span></td>
-      <td>A Stop hook speaks every finished reply while <code>/voice</code> is on. One switch controls both directions: you talk to it, it talks back.</td>
-      <td><code>claude-can-speak install-hooks</code></td>
+      <td>A Stop hook speaks every finished reply. It has its own explicit on/off switch (off by default), independent of Claude Code's <code>/voice</code> dictation.</td>
+      <td><code>claude-can-speak on</code></td>
     </tr>
   </table>
 
@@ -132,13 +132,12 @@
   <h2 id="install">Install</h2>
   <section class="apt-section">
     <pre><code>npm install -g claude-can-speak
+claude-can-speak setup     # Docker check, build, install skill + hook
 
-# one-time: build the local TTS container image (needs Docker)
-claude-can-speak build
-
-# pick the mode(s) you want
-claude-can-speak install-skill    # deliberate mode (the 'speak' skill)
-claude-can-speak install-hooks    # firehose mode (speak every reply on /voice)</code></pre>
+# then restart Claude Code once. Deliberate mode is on; the firehose is off
+# by default. Turn the firehose on when you want every reply spoken:
+claude-can-speak on        # speak every reply
+claude-can-speak off       # back to silent (default)</code></pre>
     <p style="color: var(--muted); font-size: 0.92rem;">
       If <code>npm install -g</code> fails with <code>EACCES</code> (a
       system-owned npm prefix like <code>/usr</code>), either set a user prefix
@@ -151,7 +150,7 @@ claude-can-speak install-hooks    # firehose mode (speak every reply on /voice)<
   </section>
 
   <p style="margin-top:16px;">
-    Then toggle <code>/voice</code> on in Claude Code and check it:
+    Check it:
   </p>
   <pre><code>claude-can-speak status     # gate, container, voice, model cache
 claude-can-speak test       # speak a sample line</code></pre>
@@ -176,7 +175,7 @@ claude-can-speak voice tr_TR-dfki-medium     # Turkish</code></pre>
 
   <h2>How it works</h2>
   <p>
-    When a reply finishes, the Stop hook (gated on <code>/voice</code>) strips
+    When a reply finishes and the firehose is on, the Stop hook strips
     markdown and code, then hands the text to a persistent Docker container that
     synthesises a WAV with Kokoro or Piper; the host plays it. The container
     starts once and stays warm, so the model import cost is paid once, not per
