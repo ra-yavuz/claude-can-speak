@@ -90,10 +90,12 @@
   <picture><source srcset="logo.webp" type="image/webp"><img class="brand" src="logo.png" alt="claude-can-speak logo"></picture>
   <h1>claude-can-speak</h1>
   <p class="tag">
-    Now Claude Code talks back. Speech-out to pair with the built-in
-    <code>/voice</code> speech-in: turn <code>/voice</code> on and Claude can read
-    its replies aloud; turn it off and you are back to silent, text-only. Local
-    neural voice, no cloud, no API keys.
+    Let Claude Code decide what to say out loud. Most "speak Claude aloud" tools
+    read every reply at you. This one leads with a skill that lets Claude voice
+    only what is worth hearing, a "build is done", a heads-up, a shoutout, while
+    everything else stays text. The speak-everything firehose is included too,
+    but the deliberate skill is the point. Local neural voice, no cloud, no API
+    keys.
   </p>
 
   <div class="links-row">
@@ -107,14 +109,14 @@
   <table class="matrix">
     <tr><th>Mode</th><th>What it does</th><th>Enable</th></tr>
     <tr>
-      <td><strong>Firehose</strong></td>
-      <td>A Stop hook speaks every finished reply while <code>/voice</code> is on. One switch controls both directions: you talk to it, it talks back.</td>
-      <td><code>claude-can-speak install-hooks</code></td>
+      <td><strong>Deliberate</strong><br><span style="color:var(--muted);font-size:0.82rem;">the headline</span></td>
+      <td>A <code>speak</code> skill lets Claude choose what to voice: "the build is done", a heads-up while you look away, a shoutout. Selective, on purpose, model-controlled. This is what most other tools do not do.</td>
+      <td><code>claude-can-speak install-skill</code></td>
     </tr>
     <tr>
-      <td><strong>Deliberate</strong></td>
-      <td>A <code>speak</code> skill lets Claude choose what to voice: "the build is done", a heads-up while you look away, a shoutout. Selective, on purpose.</td>
-      <td><code>claude-can-speak install-skill</code></td>
+      <td><strong>Firehose</strong><br><span style="color:var(--muted);font-size:0.82rem;">optional</span></td>
+      <td>A Stop hook speaks every finished reply while <code>/voice</code> is on. One switch controls both directions: you talk to it, it talks back.</td>
+      <td><code>claude-can-speak install-hooks</code></td>
     </tr>
   </table>
 

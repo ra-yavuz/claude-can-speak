@@ -9,7 +9,7 @@
 # any damage or loss arising from its use. By using it you accept all risk.
 set -uo pipefail
 
-VERSION="0.1.0"
+VERSION="0.1.1"
 
 # Install layout: bundled scripts live in ../lib/claude-can-speak relative to
 # this CLI, whether installed via npm (into the global node_modules) or run from

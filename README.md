@@ -1,16 +1,22 @@
 # claude-can-speak
 
-**Now Claude Code talks back.** Speech-out for Claude Code: a companion to the
-built-in `/voice` speech-in. Turn `/voice` on and Claude can read its replies
-aloud through your speakers; turn it off and you are back to silent, text-only.
-Two ways to use it, a local neural voice, nothing sent to the cloud.
+**Let Claude decide what to say out loud.** Most "speak Claude Code aloud" tools
+read *every* reply at you. claude-can-speak leads with the opposite: a Claude
+Code **skill** that gives the model a deliberate "say this" capability, so Claude
+voices only what is worth hearing, a spoken "the build is done and tests passed"
+when you have stepped away, a heads-up that a deploy needs confirmation, a short
+shoutout you asked for, while everything else stays text-only. Selective, on
+purpose, model-controlled.
 
-- **Firehose mode** - a Stop hook speaks every finished reply while `/voice` is
-  on. One switch (`/voice`) controls both directions: you talk to it, it talks
-  back.
-- **Deliberate mode** - a `speak` skill lets Claude choose what to voice: a
-  spoken "the build is done", a heads-up while you are looking away, a shoutout.
-  Selective, on purpose, not a firehose.
+If you *do* want the firehose, it is one command away: a Stop hook that speaks
+every finished reply, gated on the built-in `/voice` mode so one switch controls
+both directions (you talk to it, it talks back). But the deliberate skill is the
+point.
+
+- **Deliberate mode (the headline)** - the `speak` skill lets Claude choose what
+  to voice. Install with `claude-can-speak install-skill`.
+- **Firehose mode (optional)** - a Stop hook speaks every reply while `/voice` is
+  on. Install with `claude-can-speak install-hooks`.
 
 Speech is synthesised locally by [Kokoro](https://github.com/thewh1teagle/kokoro-onnx)
 (natural English, the default) or [Piper](https://github.com/OHF-Voice/piper1-gpl)
@@ -137,6 +143,20 @@ a Docker container, and downloads third-party models from the internet on your
 behalf. **By installing and using it you accept all risk.** You are responsible
 for complying with the licences of the bundled engines and the downloaded models
 (see [THIRD_PARTY.md](THIRD_PARTY.md)).
+
+## Related projects
+
+Speaking Claude Code's replies aloud is a well-trodden idea, and several tools do
+the firehose well: `claude-voice` (Kokoro plus karaoke word highlighting),
+`claude-code-tts` (OpenAI or Kokoro auto-speak), `claude-voice-mcp` and
+`soliloquy-tts` (MCP-based auto-speak). If all you want is "read every reply
+aloud", any of those is a fine choice and lighter than this one (no Docker).
+
+claude-can-speak is built around a different default: the deliberate `speak`
+skill, so Claude voices only what is worth hearing rather than everything. It
+also adds multilingual output (Piper for German, Turkish, and more), Docker
+isolation so the engines never touch your host Python, and gating on the built-in
+`/voice` switch. The firehose mode is included, but it is not the headline.
 
 ## Licence
 

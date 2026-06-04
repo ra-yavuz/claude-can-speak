@@ -1,7 +1,7 @@
 {
   "name": "claude-can-speak",
-  "version": "0.1.0",
-  "description": "Speech-out for Claude Code: speak replies aloud (Stop-hook firehose) or let Claude voice deliberate notifications (skill). Local neural TTS via Kokoro/Piper in Docker. Gated on /voice mode.",
+  "version": "0.1.1",
+  "description": "Let Claude Code decide what to say out loud: a skill that voices deliberate notifications (not every reply), plus an optional speak-everything Stop hook. Local neural TTS via Kokoro/Piper in Docker, gated on /voice.",
   "keywords": [
     "claude",
     "claude-code",
