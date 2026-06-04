@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# claude-can-speak: speech-out for Claude Code, gated on /voice mode.
+#
+# This CLI manages the TTS container and the playback lifecycle. The speaking
+# itself is driven by a Stop hook (tts-speak.sh); this command is for setup,
+# testing, picking a voice, and interrupting playback.
+#
+# Provided AS IS, with NO WARRANTY of any kind. The author is not liable for
+# any damage or loss arising from its use. By using it you accept all risk.
+set -uo pipefail
+
+VERSION="0.1.0"
+
+# Install layout: bundled scripts live in ../lib/claude-can-speak relative to
+# this CLI, whether installed via npm (into the global node_modules) or run from
+# a git checkout. SELF resolves through symlinks so a PATH symlink still works.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+SELF="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+LIBEXEC="$SELF/../lib/claude-can-speak"
+[ -f "$LIBEXEC/tts-speak.sh" ] || LIBEXEC="$SELF/../lib/claude-can-speak"
+
+CCS_HOME="${CCS_HOME:-$HOME/.config/claude-can-speak}"
+CONFIG="$CCS_HOME/config.env"
+PIDFILE="$CCS_HOME/speaking.pid"
+CONTAINER="${CCS_CONTAINER:-ccs-tts}"
+IMAGE="${CCS_IMAGE:-claude-can-speak:latest}"
+MODELS_DIR="${CCS_MODELS_DIR:-$HOME/.cache/claude-can-speak/models}"
+SETTINGS_JSON="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
+
+mkdir -p "$CCS_HOME" 2>/dev/null || true
+
+# Defaults; config.env overrides. (MAX_CHARS is a hook-only concern; the CLI's
+# explicit say/test never truncate, so it is not set here.)
+ENGINE="kokoro"; VOICE="af_heart"; LANG="en-us"; SPEED="1.0"
+# shellcheck source=/dev/null
+[ -f "$CONFIG" ] && . "$CONFIG"
+
+die() { echo "claude-can-speak: $*" >&2; exit 1; }
+
+# Docker is a runtime requirement (the TTS engines run in a container so they do
+# not touch the host Python env). Check for it with a clear, actionable error.
+require_docker() {
+  command -v docker >/dev/null 2>&1 || die \
+"Docker is required but was not found.
+  claude-can-speak runs the TTS engines in a container so they never touch your
+  host. Install Docker, then retry:
+    https://docs.docker.com/get-docker/"
+  docker info >/dev/null 2>&1 || die \
+"Docker is installed but the daemon is not reachable.
+  Start Docker (e.g. 'systemctl --user start docker' or Docker Desktop) and retry.
+  On Linux you may need to be in the 'docker' group: https://docs.docker.com/engine/install/linux-postinstall/"
+}
+
+cmd_help() {
+  cat <<EOF
+claude-can-speak $VERSION - speech-out for Claude Code (gated on /voice)
+
+USAGE
+  claude-can-speak <command> [args]
+
+COMMANDS
+  status            Show gate state, container, config, and model cache.
+  test [text]       Speak a sample (or the given text) with the current voice.
+  stop              Interrupt any reply currently being spoken.
+  say <text>        Speak arbitrary text now (ignores the /voice gate).
+  start | up        Start the persistent TTS container.
+  stop-container    Stop and remove the TTS container.
+  voice <name>      Set the default voice (e.g. af_heart, af_bella).
+  engine <name>     Set the engine: kokoro (English) or piper (multilingual).
+  voices            List known voices for the current engine.
+  install-hooks     Register the Stop + interrupt hooks in settings.json.
+  remove-hooks      Remove this project's hooks from settings.json.
+  install-skill     Install the 'speak' skill into ~/.claude/skills.
+  skill on|off      Enable/disable the 'speak' skill (settings skillOverrides).
+  build             Build the TTS container image locally.
+  help | --help     This text.
+
+TWO MODES
+  Firehose : the Stop hook speaks every reply while /voice is on
+             (claude-can-speak install-hooks).
+  Deliberate: the 'speak' skill lets Claude choose what to voice
+             (notifications, shoutouts) via 'claude-can-speak say'
+             (claude-can-speak install-skill). Toggle with 'skill on|off'.
+
+GATING
+  Speech-out only runs while /voice mode is on (voiceEnabled / voice.enabled
+  in $SETTINGS_JSON). Toggle /voice in Claude Code to switch both speech-in
+  and speech-out at once. Turn it off for full silence.
+
+DISCLAIMER
+  Provided AS IS, with NO WARRANTY. You accept all risk. See the project
+  README for the full text.
+EOF
+}
+
+ensure_image() {
+  docker image inspect "$IMAGE" >/dev/null 2>&1
+}
+
+cmd_build() {
+  require_docker
+  local ctx="$SELF/../container"
+  [ -f "$ctx/Dockerfile" ] || die "container build context not found ($ctx)"
+  echo "Building $IMAGE from $ctx ..."
+  docker build -t "$IMAGE" "$ctx"
+}
+
+cmd_start() {
+  require_docker
+  ensure_image || die "image $IMAGE missing; run: claude-can-speak build"
+  if docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true; then
+    echo "container $CONTAINER already running"; return 0
+  fi
+  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  mkdir -p "$MODELS_DIR"
+  docker run -d --name "$CONTAINER" -v "$MODELS_DIR:/models" "$IMAGE" >/dev/null \
+    && echo "started $CONTAINER (models cache: $MODELS_DIR)"
+}
+
+cmd_stop_container() {
+  docker rm -f "$CONTAINER" >/dev/null 2>&1 && echo "removed $CONTAINER" \
+    || echo "no container to remove"
+}
+
+cmd_stop() {
+  # Interrupt current playback. Mirrors stop_current() in the hook.
+  local pid stopped=0
+  if [ -f "$PIDFILE" ]; then
+    pid="$(cat "$PIDFILE" 2>/dev/null)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+      stopped=1
+    fi
+    rm -f "$PIDFILE" 2>/dev/null || true
+  fi
+  # Belt and suspenders: stop any stray players too.
+  pkill -TERM -x pw-play 2>/dev/null && stopped=1
+  pkill -TERM -x paplay  2>/dev/null && stopped=1
+  [ "$stopped" = 1 ] && echo "stopped playback" || echo "nothing playing"
+}
+
+_synth_to() { # text -> wav path on stdout fd
+  ensure_image || die "image $IMAGE missing; run: claude-can-speak build"
+  cmd_start >/dev/null
+  docker exec -i "$CONTAINER" python3 /app/synth.py \
+    --engine "$ENGINE" --voice "$VOICE" --lang "$LANG" --speed "$SPEED"
+}
+
+_player() {
+  for p in pw-play paplay aplay; do
+    command -v "$p" >/dev/null 2>&1 && { echo "$p"; return; }
+  done
+  return 1
+}
+
+cmd_say() {
+  local text="$*"
+  [ -n "$text" ] || die "usage: claude-can-speak say <text>"
+  local player; player="$(_player)" || die "no audio player (pw-play/paplay/aplay)"
+  local wav; wav="$(mktemp --suffix=.wav)"
+  if printf '%s' "$text" | _synth_to >"$wav" && [ -s "$wav" ]; then
+    "$player" "$wav"
+  else
+    rm -f "$wav"; die "synthesis failed"
+  fi
+  rm -f "$wav"
+}
+
+cmd_test() {
+  local text="${*:-Hi Ramazan. This is Claude Code. Voice output is working, using the $VOICE voice.}"
+  echo "engine=$ENGINE voice=$VOICE lang=$LANG"
+  cmd_say "$text"
+}
+
+cmd_status() {
+  echo "claude-can-speak $VERSION"
+  printf 'voice gate   : '
+  if [ -f "$SETTINGS_JSON" ] && command -v jq >/dev/null 2>&1 \
+     && [ "$(jq -r '(.voiceEnabled // .voice.enabled // false)|tostring' "$SETTINGS_JSON" 2>/dev/null)" = true ]; then
+    echo "ON  (/voice enabled)"
+  else
+    echo "off (/voice disabled) - replies will be silent"
+  fi
+  printf 'engine/voice : %s / %s (%s)\n' "$ENGINE" "$VOICE" "$LANG"
+  printf 'image        : '; ensure_image && echo "$IMAGE present" || echo "$IMAGE MISSING (run: build)"
+  printf 'container    : '
+  docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true \
+    && echo "$CONTAINER running" || echo "$CONTAINER not running"
+  printf 'models cache : %s' "$MODELS_DIR"
+  [ -d "$MODELS_DIR" ] && printf ' (%s)\n' "$(du -sh "$MODELS_DIR" 2>/dev/null | cut -f1)" || printf ' (empty)\n'
+  printf 'hooks        : '
+  if [ -f "$SETTINGS_JSON" ] && grep -q 'tts-speak.sh' "$SETTINGS_JSON" 2>/dev/null; then
+    echo "registered"; else echo "NOT registered (run: install-hooks)"; fi
+}
+
+_set_config() { # key value
+  touch "$CONFIG"
+  if grep -q "^$1=" "$CONFIG" 2>/dev/null; then
+    sed -i "s|^$1=.*|$1=\"$2\"|" "$CONFIG"
+  else
+    printf '%s="%s"\n' "$1" "$2" >>"$CONFIG"
+  fi
+}
+
+cmd_voice() { [ -n "${1:-}" ] || die "usage: claude-can-speak voice <name>"; _set_config VOICE "$1"; echo "voice set to $1"; }
+cmd_engine() {
+  case "${1:-}" in
+    kokoro) _set_config ENGINE kokoro; _set_config LANG en-us; echo "engine set to kokoro (English)";;
+    piper)  _set_config ENGINE piper; echo "engine set to piper (multilingual); set a voice with: claude-can-speak voice de_DE-thorsten-high";;
+    *) die "engine must be 'kokoro' or 'piper'";;
+  esac
+}
+
+cmd_voices() {
+  if [ "$ENGINE" = piper ]; then
+    cat <<EOF
+piper voices (multilingual):
+  en_US-amy-medium  en_US-lessac-high  en_US-libritts_r-medium
+  en_US-hfc_female-medium  en_US-kristin-medium  en_GB-jenny_dioco-medium
+  de_DE-thorsten-medium  de_DE-thorsten-high  tr_TR-dfki-medium
+EOF
+  else
+    cat <<EOF
+kokoro voices (English; af_=US female, am_=US male, bf_/bm_=British):
+  af_heart  af_bella  af_nicole  af_aoede  af_kore  af_sarah
+  af_nova  af_sky  af_jessica  af_river  am_michael  am_fenrir  am_puck
+EOF
+  fi
+}
+
+cmd_install_skill() {
+  # Locate the packaged skill (deb vs git checkout).
+  local src
+  for cand in "/usr/share/claude-can-speak/skills/speak" "$SELF/../skills/speak"; do
+    [ -f "$cand/SKILL.md" ] && { src="$cand"; break; }
+  done
+  [ -n "${src:-}" ] || die "packaged skill not found"
+  local dest="$HOME/.claude/skills/speak"
+  mkdir -p "$dest"
+  cp "$src/SKILL.md" "$dest/SKILL.md"
+  echo "installed 'speak' skill -> $dest/SKILL.md"
+  echo "if ~/.claude/skills did not exist before, restart your session to discover it."
+}
+
+cmd_skill() {
+  case "${1:-}" in
+    on)  _skill_override on;  echo "'speak' skill enabled" ;;
+    off) _skill_override off; echo "'speak' skill disabled" ;;
+    *) die "usage: claude-can-speak skill on|off" ;;
+  esac
+}
+
+_skill_override() { # on|off  -> settings.json skillOverrides.speak
+  [ -f "$SETTINGS_JSON" ] || { mkdir -p "$(dirname "$SETTINGS_JSON")"; echo '{}' >"$SETTINGS_JSON"; }
+  python3 - "$SETTINGS_JSON" "$1" <<'PY'
+import json, sys, os
+path, state = sys.argv[1], sys.argv[2]
+with open(path) as f: cfg = json.load(f)
+ov = cfg.setdefault("skillOverrides", {})
+if state == "off": ov["speak"] = "off"
+else: ov.pop("speak", None)        # remove override = default 'on'
+tmp = path + ".tmp"
+with open(tmp, "w") as f: json.dump(cfg, f, indent=2); f.write("\n")
+os.replace(tmp, path)
+PY
+}
+
+cmd_install_hooks() {
+  [ -x "$LIBEXEC/install-hooks.sh" ] || die "install-hooks.sh not found in $LIBEXEC"
+  "$LIBEXEC/install-hooks.sh" install
+}
+cmd_remove_hooks() {
+  [ -x "$LIBEXEC/install-hooks.sh" ] || die "install-hooks.sh not found in $LIBEXEC"
+  "$LIBEXEC/install-hooks.sh" remove
+}
+
+case "${1:-help}" in
+  status)         cmd_status ;;
+  test)           shift; cmd_test "$@" ;;
+  say)            shift; cmd_say "$@" ;;
+  stop)           cmd_stop ;;
+  start|up)       cmd_start ;;
+  stop-container) cmd_stop_container ;;
+  voice)          shift; cmd_voice "${1:-}" ;;
+  engine)         shift; cmd_engine "${1:-}" ;;
+  voices)         cmd_voices ;;
+  install-hooks)  cmd_install_hooks ;;
+  remove-hooks)   cmd_remove_hooks ;;
+  install-skill)  cmd_install_skill ;;
+  skill)          shift; cmd_skill "${1:-}" ;;
+  build)          cmd_build ;;
+  help|-h|--help) cmd_help ;;
+  --version|-V)   echo "claude-can-speak $VERSION" ;;
+  *)              die "unknown command '$1' (try: claude-can-speak help)" ;;
+esac

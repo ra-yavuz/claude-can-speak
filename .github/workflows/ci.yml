@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck bin/claude-can-speak lib/claude-can-speak/*.sh container/serve.sh
+
+      - name: bash syntax
+        run: |
+          for f in bin/claude-can-speak lib/claude-can-speak/*.sh container/serve.sh; do
+            bash -n "$f"
+          done
+
+      - name: python syntax
+        run: |
+          python3 -m py_compile container/synth.py lib/claude-can-speak/clean.py
+
+      - name: node + package
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --check bin/cli.js
+      - run: node -e "require('./package.json')"
+      - run: npm pack --dry-run
+
+      - name: guard against em dashes and AI attribution
+        run: |
+          if grep -rnP '\xE2\x80\x94' --include='*.md' --include='*.sh' \
+               --include='*.py' --include='*.js' --include='*.json' .; then
+            echo "em dash found"; exit 1
+          fi
+
+  publish:
+    needs: lint
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: publish to npm
+        # Requires the NPM_TOKEN repository secret (an npm automation token).
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: github release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

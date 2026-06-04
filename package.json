@@ -1,0 +1,49 @@
+{
+  "name": "claude-can-speak",
+  "version": "0.1.0",
+  "description": "Speech-out for Claude Code: speak replies aloud (Stop-hook firehose) or let Claude voice deliberate notifications (skill). Local neural TTS via Kokoro/Piper in Docker. Gated on /voice mode.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "tts",
+    "text-to-speech",
+    "voice",
+    "kokoro",
+    "piper",
+    "speech",
+    "skill",
+    "hook"
+  ],
+  "homepage": "https://ra-yavuz.github.io/claude-can-speak/",
+  "bugs": {
+    "url": "https://github.com/ra-yavuz/claude-can-speak/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ra-yavuz/claude-can-speak.git"
+  },
+  "license": "MIT",
+  "author": "Ramazan Yavuz <yavuzramazan1994@gmail.com>",
+  "type": "commonjs",
+  "bin": {
+    "claude-can-speak": "bin/cli.js"
+  },
+  "files": [
+    "bin/cli.js",
+    "bin/claude-can-speak",
+    "lib/claude-can-speak/",
+    "container/",
+    "skills/",
+    "THIRD_PARTY.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ]
+}

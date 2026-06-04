@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>claude-can-speak - Speech-out for Claude Code</title>
+<meta name="description" content="claude-can-speak by Ramazan Yavuz: make Claude Code talk back. A Stop hook speaks every reply while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS (Kokoro / Piper) in Docker. No cloud, no API keys.">
+<meta name="author" content="Ramazan Yavuz">
+<meta name="keywords" content="claude-can-speak, claude code, text to speech, tts, voice output, kokoro, piper, claude code hook, claude code skill, local tts, offline tts">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://ra-yavuz.github.io/claude-can-speak/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="claude-can-speak - Now Claude Code talks back">
+<meta property="og:description" content="Speech-out for Claude Code. A Stop hook reads replies aloud while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS, no cloud.">
+<meta property="og:url" content="https://ra-yavuz.github.io/claude-can-speak/">
+<meta property="og:site_name" content="ra-yavuz">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="claude-can-speak - Now Claude Code talks back">
+<meta name="twitter:description" content="Speech-out for Claude Code. Local neural TTS (Kokoro / Piper) in Docker, gated on /voice. No cloud, no API keys.">
+<meta property="og:image" content="https://ra-yavuz.github.io/claude-can-speak/logo.png">
+<meta name="twitter:image" content="https://ra-yavuz.github.io/claude-can-speak/logo.png">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+  :root {
+    --fg: #1a1a1a; --muted: #5e5e5e; --bg: #f4f1ec; --card: #ffffff;
+    --line: #d8d4cc; --code-bg: #ebe7e0; --link: #0a4ca8; --apt-bg: #eef2f8;
+    --warn-bg: #fff7d6; --warn-fg: #5a4500; --warn-line: #e8d36b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #ececec; --muted: #9a9a9a; --bg: #1c1d20; --card: #25272b;
+      --line: #353941; --code-bg: #14151a; --link: #7cb0ff; --apt-bg: #1f242d;
+      --warn-bg: #3a2e00; --warn-fg: #f6e2a4; --warn-line: #6a5500;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg); background: var(--bg); line-height: 1.55; overflow-wrap: break-word;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  @media (max-width: 540px) { main { padding: 28px 16px 64px; } }
+  .crumb { font-size: 0.86rem; color: var(--muted); margin: 0 0 18px; }
+  .brand {
+    position: fixed; top: 20px; right: 24px; width: 110px; height: 110px;
+    object-fit: contain; object-position: top right; pointer-events: none; z-index: 10;
+  }
+  @media (max-width: 720px) { .brand { width: 76px; height: 76px; top: 12px; right: 12px; } }
+  @media (max-width: 480px) { .brand { display: none; } }
+  h1 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.005em; }
+  p.tag { color: var(--muted); margin: 0 0 18px; font-size: 1rem; max-width: 62ch; }
+  h2 { font-size: 1rem; margin: 36px 0 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--line); overflow-x: auto; font-size: 0.86rem; line-height: 1.55; margin: 0; }
+  pre code { background: transparent; padding: 0; }
+  .links-row a { margin-right: 14px; font-size: 0.95rem; }
+  .apt-section { background: var(--apt-bg); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; }
+  .apt-section h2 { margin-top: 0; }
+  .warn { background: var(--warn-bg); color: var(--warn-fg); border-left: 4px solid var(--warn-line); padding: 12px 16px; border-radius: 4px; font-size: 0.9rem; margin: 12px 0 0; }
+  table.matrix { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  table.matrix th, table.matrix td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.matrix th { color: var(--muted); font-weight: 600; }
+  footer { margin-top: 56px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "claude-can-speak",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows (WSL)",
+  "description": "Speech-out for Claude Code. A Stop hook reads each reply aloud while /voice is on, or a skill lets Claude voice deliberate notifications. Local neural TTS (Kokoro / Piper) in Docker, no cloud and no API keys.",
+  "url": "https://ra-yavuz.github.io/claude-can-speak/",
+  "downloadUrl": "https://www.npmjs.com/package/claude-can-speak",
+  "softwareVersion": "0.1.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": { "@type": "Person", "name": "Ramazan Yavuz", "url": "https://ra-yavuz.github.io/" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+</head>
+<body>
+<main>
+  <p class="crumb"><a href="https://ra-yavuz.github.io/">ra-yavuz</a> &rsaquo; claude-can-speak</p>
+
+  <picture><source srcset="logo.webp" type="image/webp"><img class="brand" src="logo.png" alt="claude-can-speak logo"></picture>
+  <h1>claude-can-speak</h1>
+  <p class="tag">
+    Now Claude Code talks back. Speech-out to pair with the built-in
+    <code>/voice</code> speech-in: turn <code>/voice</code> on and Claude can read
+    its replies aloud; turn it off and you are back to silent, text-only. Local
+    neural voice, no cloud, no API keys.
+  </p>
+
+  <div class="links-row">
+    <a href="https://www.npmjs.com/package/claude-can-speak">npm</a>
+    <a href="https://github.com/ra-yavuz/claude-can-speak">source</a>
+    <a href="#install">install</a>
+    <a href="https://github.com/ra-yavuz/claude-can-speak/issues">issues</a>
+  </div>
+
+  <h2>Two ways to use it</h2>
+  <table class="matrix">
+    <tr><th>Mode</th><th>What it does</th><th>Enable</th></tr>
+    <tr>
+      <td><strong>Firehose</strong></td>
+      <td>A Stop hook speaks every finished reply while <code>/voice</code> is on. One switch controls both directions: you talk to it, it talks back.</td>
+      <td><code>claude-can-speak install-hooks</code></td>
+    </tr>
+    <tr>
+      <td><strong>Deliberate</strong></td>
+      <td>A <code>speak</code> skill lets Claude choose what to voice: "the build is done", a heads-up while you look away, a shoutout. Selective, on purpose.</td>
+      <td><code>claude-can-speak install-skill</code></td>
+    </tr>
+  </table>
+
+  <h2>Requirements</h2>
+  <p>
+    Claude Code, Node.js 16+ / npm, and <strong>Docker</strong> (the TTS engines
+    run in a container so they never touch your host Python). On Linux you also
+    need an audio player: <code>pw-play</code>, <code>paplay</code>, or
+    <code>aplay</code>. The CLI checks for Docker and tells you how to install it
+    if it is missing.
+  </p>
+
+  <h2 id="install">Install</h2>
+  <section class="apt-section">
+    <pre><code>npm install -g claude-can-speak
+
+# one-time: build the local TTS container image (needs Docker)
+claude-can-speak build
+
+# pick the mode(s) you want
+claude-can-speak install-skill    # deliberate mode (the 'speak' skill)
+claude-can-speak install-hooks    # firehose mode (speak every reply on /voice)</code></pre>
+    <p style="color: var(--muted); font-size: 0.92rem;">
+      If <code>npm install -g</code> fails with <code>EACCES</code> (a
+      system-owned npm prefix like <code>/usr</code>), either set a user prefix
+      once with <code>npm config set prefix ~/.npm-global</code> and add
+      <code>~/.npm-global/bin</code> to your <code>PATH</code>, or install with
+      <code>sudo</code>. Models download on first use into
+      <code>~/.cache/claude-can-speak/models</code>; nothing model-shaped ships
+      in the package.
+    </p>
+  </section>
+
+  <p style="margin-top:16px;">
+    Then toggle <code>/voice</code> on in Claude Code and check it:
+  </p>
+  <pre><code>claude-can-speak status     # gate, container, voice, model cache
+claude-can-speak test       # speak a sample line</code></pre>
+
+  <h2>Choosing a voice</h2>
+  <p>
+    The default is Kokoro <code>af_heart</code> (natural US English). List
+    options with <code>claude-can-speak voices</code>. For German or Turkish,
+    switch to the multilingual Piper engine:
+  </p>
+  <pre><code>claude-can-speak engine piper
+claude-can-speak voice de_DE-thorsten-high   # German
+claude-can-speak voice tr_TR-dfki-medium     # Turkish</code></pre>
+
+  <h2>Interrupting</h2>
+  <p>
+    Stop playback any time with <code>claude-can-speak stop</code>, or just send
+    your next message: a <code>UserPromptSubmit</code> hook silences the previous
+    reply. A new reply also supersedes the old one. Interrupts stop both
+    in-flight synthesis and active playback.
+  </p>
+
+  <h2>How it works</h2>
+  <p>
+    When a reply finishes, the Stop hook (gated on <code>/voice</code>) strips
+    markdown and code, then hands the text to a persistent Docker container that
+    synthesises a WAV with Kokoro or Piper; the host plays it. The container
+    starts once and stays warm, so the model import cost is paid once, not per
+    reply. Only audio crosses back to the host. The <code>speak</code> skill
+    drives the same pipeline through <code>claude-can-speak say</code>, but only
+    when Claude (or you) chooses to speak. Everything runs locally: no network at
+    speak time, no telemetry.
+  </p>
+
+  <h2>Disclaimer / no warranty</h2>
+  <div class="warn">
+    This software is provided <strong>as is, without warranty of any kind</strong>,
+    express or implied. The author is not liable for any damage, data loss, or
+    other harm arising from its use. It runs background processes, plays audio,
+    builds and runs a Docker container, and downloads third-party speech models
+    from the internet on your behalf. You are responsible for complying with the
+    licences of the bundled engines and the downloaded models. By installing or
+    using this software you accept full responsibility for any consequences.
+    Full text:
+    <a href="https://github.com/ra-yavuz/claude-can-speak#disclaimer">repo README</a>
+    and <a href="https://github.com/ra-yavuz/claude-can-speak/blob/main/THIRD_PARTY.md">THIRD_PARTY.md</a>;
+    licence: MIT.
+  </div>
+
+  <footer>
+    <p>
+      Author: <a href="https://ra-yavuz.github.io/">Ramazan Yavuz</a>.
+      Source: <a href="https://github.com/ra-yavuz/claude-can-speak">github.com/ra-yavuz/claude-can-speak</a>.
+      Package: <a href="https://www.npmjs.com/package/claude-can-speak">npmjs.com/package/claude-can-speak</a>.
+    </p>
+    <p style="font-size:0.78rem;opacity:0.7;margin-top:14px;line-height:1.6;">
+      This page does not use cookies, tracking, or analytics. Outbound links lead to third-party websites outside our control; we are not liable for their content or privacy practices.
+    </p>
+  </footer>
+</main>
+</body>
+</html>
