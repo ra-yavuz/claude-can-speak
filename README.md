@@ -15,7 +15,15 @@ every finished reply, with its own explicit on/off (`claude-can-speak on` /
 - **Deliberate mode (the headline)** - the `speak` skill lets Claude choose what
   to voice. Active after `claude-can-speak setup`.
 - **Firehose mode (optional)** - a Stop hook speaks every reply when you turn it
-  on with `claude-can-speak on` (off by default).
+  on with `claude-can-speak on` (off by default), or `/ccs on` from inside
+  Claude Code.
+
+> **The toggle is a command, not a built-in slash setting.** claude-can-speak
+> does not hook into Claude Code's `/voice`; if you type `/` in Claude Code
+> before setup and find nothing, that is expected. Control the firehose from the
+> terminal with `claude-can-speak on` / `off`, or from inside Claude Code with
+> the `/ccs on` / `/ccs off` / `/ccs status` slash command that `setup`
+> installs.
 
 Speech is synthesised locally by [Kokoro](https://github.com/thewh1teagle/kokoro-onnx)
 (natural English, the default) or [Piper](https://github.com/OHF-Voice/piper1-gpl)
@@ -47,16 +55,26 @@ claude-can-speak setup     # Docker check, build image, install skill + hook
 > `npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH"`
 > (add that `export` to your shell profile), or install with `sudo`.
 
+`setup` also installs a `/ccs` slash command into Claude Code, so the firehose
+toggle is reachable from where you would instinctively look for it. **Restart
+Claude Code once** after setup so it discovers the skill and the command.
+
 After setup:
 
 - **Deliberate mode** (the headline) is active: Claude can voice notifications
   through the `speak` skill whenever it judges something worth hearing.
 - **Firehose mode** (speak every reply) is **off by default**. Turn it on when
-  you want it:
+  you want it, from the terminal or from inside Claude Code:
 
 ```sh
 claude-can-speak on      # speak every reply
 claude-can-speak off     # back to silent (default)
+```
+
+```text
+/ccs on        # same, from inside Claude Code
+/ccs off
+/ccs status
 ```
 
 Models are downloaded on first use into `~/.cache/claude-can-speak/models`

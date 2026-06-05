@@ -1,6 +1,6 @@
 {
   "name": "claude-can-speak",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Let Claude Code decide what to say out loud: a skill that voices deliberate notifications (not every reply), plus an optional speak-everything Stop hook. Local neural TTS via Kokoro/Piper in Docker, gated on /voice.",
   "keywords": [
     "claude",
@@ -38,6 +38,7 @@
     "lib/claude-can-speak/",
     "container/",
     "skills/",
+    "commands/",
     "THIRD_PARTY.md",
     "LICENSE",
     "README.md"

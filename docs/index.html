@@ -116,7 +116,7 @@
     <tr>
       <td><strong>Firehose</strong><br><span style="color:var(--muted);font-size:0.82rem;">optional</span></td>
       <td>A Stop hook speaks every finished reply. It has its own explicit on/off switch (off by default), independent of Claude Code's <code>/voice</code> dictation.</td>
-      <td><code>claude-can-speak on</code></td>
+      <td><code>claude-can-speak on</code><br>or <code>/ccs on</code></td>
     </tr>
   </table>
 
@@ -132,11 +132,12 @@
   <h2 id="install">Install</h2>
   <section class="apt-section">
     <pre><code>npm install -g claude-can-speak
-claude-can-speak setup     # Docker check, build, install skill + hook
+claude-can-speak setup     # Docker check, build, install skill + /ccs + hook
 
 # then restart Claude Code once. Deliberate mode is on; the firehose is off
 # by default. Turn the firehose on when you want every reply spoken:
-claude-can-speak on        # speak every reply
+claude-can-speak on        # speak every reply (terminal)
+/ccs on                    # same, from inside Claude Code
 claude-can-speak off       # back to silent (default)</code></pre>
     <p style="color: var(--muted); font-size: 0.92rem;">
       If <code>npm install -g</code> fails with <code>EACCES</code> (a
@@ -146,6 +147,18 @@ claude-can-speak off       # back to silent (default)</code></pre>
       <code>sudo</code>. Models download on first use into
       <code>~/.cache/claude-can-speak/models</code>; nothing model-shaped ships
       in the package.
+    </p>
+    <p style="color: var(--muted); font-size: 0.92rem;">
+      <strong>The toggle is a command, not a built-in slash setting.</strong>
+      claude-can-speak does not hook into Claude Code's <code>/voice</code>; if
+      you type <code>/</code> in Claude Code before setup and find nothing, that
+      is expected. Control the firehose from the terminal with
+      <code>claude-can-speak on</code> / <code>off</code>, or from inside Claude
+      Code with the <code>/ccs</code> slash command that <code>setup</code>
+      installs. After turning the firehose on, replies are spoken from the next
+      session that starts; Claude Code reads its hook roster at session start, so
+      <strong>start a fresh session once</strong> after the first
+      <code>setup</code> for the speak-every-reply hook to take effect.
     </p>
   </section>
 

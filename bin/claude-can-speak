@@ -9,7 +9,7 @@
 # any damage or loss arising from its use. By using it you accept all risk.
 set -uo pipefail
 
-VERSION="0.1.2"
+VERSION="0.1.3"
 
 # Install layout: bundled scripts live in ../lib/claude-can-speak relative to
 # this CLI, whether installed via npm (into the global node_modules) or run from
@@ -79,6 +79,8 @@ COMMANDS
   install-hooks     Register the Stop + interrupt hooks in settings.json.
   remove-hooks      Remove this project's hooks from settings.json.
   install-skill     Install the 'speak' skill into ~/.claude/skills.
+  install-command   Install the '/ccs' slash command into ~/.claude/commands.
+  remove-command    Remove the '/ccs' slash command.
   skill on|off      Enable/disable the 'speak' skill (settings skillOverrides).
   build             Build the TTS container image locally.
   help | --help     This text.
@@ -89,7 +91,9 @@ TWO MODES
              Install with 'claude-can-speak install-skill'.
   Firehose (optional): the Stop hook speaks every reply when the firehose is
              on. Install the hook with 'claude-can-speak install-hooks', then
-             toggle with 'claude-can-speak on' / 'off'.
+             toggle with 'claude-can-speak on' / 'off' from the terminal, or
+             '/ccs on' / '/ccs off' from inside Claude Code (the /ccs slash
+             command is a convenience wrapper; run 'install-command' to add it).
 
 GATING
   The firehose has its own explicit on/off switch ('claude-can-speak on|off',
@@ -258,16 +262,20 @@ cmd_setup() {
   require_docker
   echo "1/3 building the TTS container image (first time pulls deps, ~2 min) ..."
   cmd_build
-  echo "2/3 installing the 'speak' skill ..."
+  echo "2/4 installing the 'speak' skill ..."
   cmd_install_skill
-  echo "3/3 installing the firehose Stop hook ..."
+  echo "3/4 installing the '/ccs' slash command ..."
+  cmd_install_command
+  echo "4/4 installing the firehose Stop hook ..."
   cmd_install_hooks
   cat <<EOF
 
 Setup complete.
   - Deliberate mode: Claude can voice notifications via the 'speak' skill (active now).
   - Firehose mode:   turn it on with 'claude-can-speak on' (off by default).
-  Restart Claude Code once so it loads the new skill and hook, then try:
+  Restart Claude Code once so it loads the new skill, the /ccs command, and the
+  hook. After that you can toggle the firehose from inside Claude Code with
+  '/ccs on' and '/ccs off', or from the terminal:
     claude-can-speak on
     claude-can-speak test
 EOF
@@ -285,6 +293,25 @@ cmd_install_skill() {
   cp "$src/SKILL.md" "$dest/SKILL.md"
   echo "installed 'speak' skill -> $dest/SKILL.md"
   echo "if ~/.claude/skills did not exist before, restart your session to discover it."
+}
+
+cmd_install_command() {
+  # Locate the packaged slash command (deb vs git checkout).
+  local src
+  for cand in "/usr/share/claude-can-speak/commands/ccs.md" "$SELF/../commands/ccs.md"; do
+    [ -f "$cand" ] && { src="$cand"; break; }
+  done
+  [ -n "${src:-}" ] || die "packaged slash command not found"
+  local dest="$HOME/.claude/commands/ccs.md"
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+  echo "installed '/ccs' slash command -> $dest"
+  echo "restart Claude Code once so it discovers the new command, then use /ccs status."
+}
+
+cmd_remove_command() {
+  local dest="$HOME/.claude/commands/ccs.md"
+  if [ -f "$dest" ]; then rm -f "$dest"; echo "removed '/ccs' slash command"; else echo "'/ccs' not installed"; fi
 }
 
 cmd_skill() {
@@ -335,6 +362,8 @@ case "${1:-help}" in
   install-hooks)  cmd_install_hooks ;;
   remove-hooks)   cmd_remove_hooks ;;
   install-skill)  cmd_install_skill ;;
+  install-command) cmd_install_command ;;
+  remove-command)  cmd_remove_command ;;
   skill)          shift; cmd_skill "${1:-}" ;;
   build)          cmd_build ;;
   help|-h|--help) cmd_help ;;
